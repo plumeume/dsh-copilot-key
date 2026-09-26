@@ -12,6 +12,8 @@ Remove-Item (Join-Path $root 'launcher.log') -ErrorAction SilentlyContinue
 $env:PATH = "$PSScriptRoot;$env:PATH"
 $env:DSH_LAUNCH_PORT = "$port"
 $env:DSH_LAUNCH_URL  = $url
+# skip the desktop-app branch of launch-dsh.ps1 so this test can still reach the web path
+$env:DSH_LAUNCH_FORCE_WEB = '1'
 
 $proc = Start-Process -FilePath 'powershell' -PassThru -WindowStyle Minimized -ArgumentList @(
     '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $root 'launch-dsh.ps1'))

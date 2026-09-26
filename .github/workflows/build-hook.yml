@@ -2,21 +2,64 @@ name: build hook
 
 on:
   push:
-    paths: ['hook/**', '.github/workflows/build-hook.yml']
+    branches: [master]
+    tags: ['v*']
+    paths:
+      - 'hook/**'
+      - '.github/workflows/build-hook.yml'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag whose release should receive the built exe (empty = artifact only)'
+        required: false
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Build DshCopilotKey.exe (system csc.exe)
         shell: pwsh
         run: ./hook/build.ps1
+
       - name: SHA256
         shell: pwsh
-        run: Get-FileHash ./hook/DshCopilotKey.exe -Algorithm SHA256 | Format-List
+        run: |
+          $hash = (Get-FileHash ./hook/DshCopilotKey.exe -Algorithm SHA256).Hash
+          "$hash  DshCopilotKey.exe" | Set-Content ./hook/DshCopilotKey.exe.sha256 -Encoding ascii
+          "### SHA256`n`n```````n$hash```````" | Add-Content $env:GITHUB_STEP_SUMMARY
+          Write-Host "SHA256 $hash"
+
       - uses: actions/upload-artifact@v4
         with:
           name: DshCopilotKey-win-x64
-          path: hook/DshCopilotKey.exe
+          path: |
+            hook/DshCopilotKey.exe
+            hook/DshCopilotKey.exe.sha256
+
+      # A tag push publishes the freshly built exe as a release asset, so the download link in the
+      # README can never point at a stale binary. Can also be run by hand (workflow_dispatch) with a
+      # release_tag input, which is the fallback when the tag push did not trigger this workflow.
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          # gh writes "release not found" to stderr; keep that from failing the step
+          $ErrorActionPreference = 'Continue'
+          $exists = gh release view $env:TAG -R $env:REPO --json tagName --jq .tagName 2>$null
+          if (-not $exists) {
+            gh release create $env:TAG -R $env:REPO --title $env:TAG --generate-notes
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+          gh release upload $env:TAG -R $env:REPO hook/DshCopilotKey.exe hook/DshCopilotKey.exe.sha256 --clobber
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host '--- release assets ---'
+          gh release view $env:TAG -R $env:REPO --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'

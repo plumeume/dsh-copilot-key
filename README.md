@@ -7,6 +7,9 @@
 | 目录 | 是什么 |
 |---|---|
 | [`hook/`](hook/) | 自研按键钩子（9 KB C#，无第三方依赖）：识别 Copilot 组合键、避免开始菜单弹出、启动或聚焦 DSH。带登录自启的计划任务。 |
+
+按下这个键**不会弹出任何窗口**：启动链（`cmd → powershell`）以 `CREATE_NO_WINDOW` 运行，从创建起就没有控制台；
+唯一会出现的窗口就是 DeepSeek Harness 自己的窗口。
 | [`plugin/`](plugin/) | DeepSeek Harness 插件 `dsh-copilot-key`：在 App 内管理钩子 —— 状态、启停、手动触发、改配置、看日志，并暴露 7 个 agent 工具。 |
 
 ## 为什么要在 App 里管它
@@ -28,13 +31,16 @@ New-Item -ItemType Directory $dir -Force | Out-Null
 $base = "https://github.com/plumeume/dsh-copilot-key"
 $raw  = "https://raw.githubusercontent.com/plumeume/dsh-copilot-key/master/hook"
 
-Invoke-WebRequest "$base/releases/download/v1.0.0/DshCopilotKey.exe" -OutFile "$dir\DshCopilotKey.exe"
+Invoke-WebRequest "$base/releases/download/v1.0.2/DshCopilotKey.exe"        -OutFile "$dir\DshCopilotKey.exe"
+Invoke-WebRequest "$base/releases/download/v1.0.2/DshCopilotKey.exe.sha256" -OutFile "$dir\DshCopilotKey.exe.sha256"
 Invoke-WebRequest "$raw/config.example.ini" -OutFile "$dir\config.ini"
 Invoke-WebRequest "$raw/install.ps1"        -OutFile "$dir\install.ps1"
 Invoke-WebRequest "$raw/uninstall.ps1"      -OutFile "$dir\uninstall.ps1"
 
-# 校验：应输出 D4CD3941A5752CFF1C37AC98AAF55D6A24C38CE4F25D42EE4BA5DD6814A06349
-Get-FileHash "$dir\DshCopilotKey.exe" -Algorithm SHA256
+# 校验：exe 由 CI 现场编译，哈希随构建变化，所以 .sha256 随 Release 一起发布
+$want = (Get-Content "$dir\DshCopilotKey.exe.sha256" -Raw).Split()[0]
+$have = (Get-FileHash "$dir\DshCopilotKey.exe" -Algorithm SHA256).Hash
+if ($want -ne $have) { throw "SHA256 mismatch: $have" } else { "SHA256 OK: $have" }
 
 # 注册登录自启的计划任务并立即启动
 powershell -ExecutionPolicy Bypass -File "$dir\install.ps1"
@@ -83,6 +89,11 @@ powershell -ExecutionPolicy Bypass -File install.ps1    # 注册登录自启并�
    - `%LOCALAPPDATA%\npm-cache\_npx` 里**版本最高**的缓存构建 → `node <bin.js> web`
    - 都没有 → **`npx -y @deepseek-ai/dsh@alpha web`**（⚠️ 这一步会**联网下载**一个新的 dsh 到 npx 缓存）
 5. `dsh web` 就绪后由它自己打开浏览器；启动器只在第 3 步（端口已在监听）时开浏览器，避免开出两个标签页。
+
+> **第 4 步全程不可见（1.0.2 起）**：钩子用 `CreateProcess` + `CREATE_NO_WINDOW` 而非 ShellExecute 启动启动器，
+> `cmd` 与 `powershell` 从创建起就没有控制台窗口，按键不会再闪出 cmd / 终端窗口。
+> 若你自己写 `launcher`，同样不必担心弹窗；但失败时的 `pause` 之类要留意 —— 隐藏运行的子进程会拿到
+> `DSH_COPILOT_HIDDEN=1`，可以用 `if not defined DSH_COPILOT_HIDDEN` 跳过。
 
 > 只用桌面端、不希望第 4 步去下 Web 版？把 `config.ini` 的 `launcher` 指向你自己的脚本
 > （例如只做 `Start-Process "$env:LOCALAPPDATA\Programs\DeepSeek Harness\DeepSeek Harness.exe"`）。

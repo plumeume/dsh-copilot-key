@@ -29,7 +29,7 @@ if ((whoami /groups) 2>$null | Select-String -Quiet 'S-1-16-4096') {
     # is still Medium-labelled but this process is Low.
     Add-Content -Path $log -Encoding UTF8 -ErrorAction SilentlyContinue -Value ("{0} FATAL: launched at Low integrity level -> dsh cannot write its profile" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'))
     Write-Host 'FATAL: this launch chain runs at Low integrity (S-1-16-4096), so dsh cannot write its profile and dies with EPERM.' -ForegroundColor Red
-    Write-Host 'Fix: icacls <hook dir> /setintegritylevel "(OI)(CI)Medium"' -ForegroundColor Yellow
+    Write-Host 'Fix: icacls C:\dsh /setintegritylevel "(OI)(CI)Medium"' -ForegroundColor Yellow
     Write-Host 'Then restart the watcher (log off/on, or Stop-Process DshCopilotKey then Start-ScheduledTask DshCopilotKey) and press the key again.' -ForegroundColor Yellow
     exit 1
 }
@@ -44,15 +44,18 @@ Write-Host '================================================' -ForegroundColor C
 # through to "npx -y @deepseek-ai/dsh@alpha web" and silently re-download a second harness.
 # Behaviour now: focus the running desktop app, else start it. The web-server path below stays
 # as a fallback for the case where the desktop install is missing.
+# test/cold-start-test.ps1 sets DSH_LAUNCH_FORCE_WEB=1: without it this desktop-first branch
+# short-circuits the legacy web path below and the cold-start test can no longer reach it.
+$forceWeb = ($env:DSH_LAUNCH_FORCE_WEB -eq '1')
 $desktopExe = Join-Path $env:LOCALAPPDATA 'Programs\DeepSeek Harness\DeepSeek Harness.exe'
 $desktopMain = Get-Process -Name 'DeepSeek Harness' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | Select-Object -First 1
-if ($desktopMain) {
+if (-not $forceWeb -and $desktopMain) {
     Write-Log "desktop app already running (pid $($desktopMain.Id)) -> focusing its window"
     Write-Host 'DeepSeek Harness desktop app is already running - focusing it' -ForegroundColor Green
     try { (New-Object -ComObject WScript.Shell).AppActivate([int]$desktopMain.Id) | Out-Null } catch { }
     exit 0
 }
-if (Test-Path $desktopExe) {
+if (-not $forceWeb -and (Test-Path $desktopExe)) {
     Write-Log "starting desktop app: $desktopExe"
     Write-Host 'starting DeepSeek Harness (desktop app) ...' -ForegroundColor Yellow
     Start-Process $desktopExe

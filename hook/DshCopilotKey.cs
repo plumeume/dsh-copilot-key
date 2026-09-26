@@ -126,12 +126,21 @@ internal sealed class Config
             if (v.Length == 0) continue;
             if (k == "port") { int p; if (int.TryParse(v, out p)) c.Port = p; }
             else if (k == "url") c.Url = v;
-            else if (k == "launcher") c.Launcher = v;
-            else if (k == "log") c.LogPath = v;
+            else if (k == "launcher") c.Launcher = Resolve(dir, v);
+            else if (k == "log") c.LogPath = Resolve(dir, v);
             else if (k == "trigger") c.Trigger = v.ToLowerInvariant();
             else if (k == "dryrun") c.DryRun = (v == "1" || v.ToLowerInvariant() == "true" || v.ToLowerInvariant() == "yes");
         }
         return c;
+    }
+
+    // config.example.ini documents launcher/log as "absolute, or relative to the directory holding
+    // this file". A relative value used to be taken as-is, so it only worked by accident: install.ps1
+    // sets the scheduled task's working directory to the hook folder. Resolve it here instead.
+    private static string Resolve(string dir, string value)
+    {
+        if (string.IsNullOrEmpty(value) || string.IsNullOrEmpty(dir)) return value;
+        return Path.IsPathRooted(value) ? value : Path.Combine(dir, value);
     }
 }
 
@@ -276,23 +285,36 @@ internal static class Program
 
             if (File.Exists(_cfg.Launcher))
             {
-                Log("port " + _cfg.Port + " closed -> starting launcher: " + _cfg.Launcher);
-                ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c \"\"" + _cfg.Launcher + "\"\"");
-                psi.UseShellExecute = true;
-                psi.WorkingDirectory = Path.GetDirectoryName(_cfg.Launcher);
-                Process.Start(psi);
+                Log("port " + _cfg.Port + " closed -> starting launcher (hidden): " + _cfg.Launcher);
+                StartHidden("cmd.exe", "/c \"\"" + _cfg.Launcher + "\"\"", Path.GetDirectoryName(_cfg.Launcher));
                 return;
             }
 
-            Log("launcher not found, falling back to npx");
-            ProcessStartInfo fb = new ProcessStartInfo("cmd.exe", "/k npx -y @deepseek-ai/dsh@alpha web");
-            fb.UseShellExecute = true;
-            Process.Start(fb);
+            Log("launcher not found, falling back to npx (hidden)");
+            StartHidden("cmd.exe", "/c npx -y @deepseek-ai/dsh@alpha web", null);
         }
         catch (Exception ex)
         {
             Log("launch failed: " + ex.Message);
         }
+    }
+
+    // The launcher is a console program (cmd -> powershell). ShellExecute - what this used to do -
+    // creates it with a brand new console, and Windows hands that console to the default terminal
+    // app, so every key press threw a terminal window over whatever was on screen. CreateProcess
+    // with CREATE_NO_WINDOW (UseShellExecute=false + CreateNoWindow=true) gives the child a
+    // console without any window: same chain, nothing visible.
+    private const string HiddenEnv = "DSH_COPILOT_HIDDEN";
+
+    private static void StartHidden(string fileName, string arguments, string workingDirectory)
+    {
+        ProcessStartInfo psi = new ProcessStartInfo(fileName, arguments);
+        psi.UseShellExecute = false;                 // required for CreateNoWindow / EnvironmentVariables
+        psi.CreateNoWindow = true;                   // CREATE_NO_WINDOW: a console, but no window
+        psi.WindowStyle = ProcessWindowStyle.Hidden;
+        psi.EnvironmentVariables[HiddenEnv] = "1";   // launch-dsh.cmd: no console to pause on
+        if (!string.IsNullOrEmpty(workingDirectory)) psi.WorkingDirectory = workingDirectory;
+        Process.Start(psi);
     }
 
     private static IntPtr WatchCallback(int nCode, IntPtr wParam, IntPtr lParam)
