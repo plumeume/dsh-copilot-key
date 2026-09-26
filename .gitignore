@@ -13,3 +13,10 @@ probe.log
 .idea/
 Thumbs.db
 desktop.ini
+
+# credentials - never commit these
+.npmrc
+.env
+.env.*
+*.pem
+*.key
