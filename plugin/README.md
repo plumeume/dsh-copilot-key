@@ -50,6 +50,23 @@ dsh plugin --profile <profile> add dsh-copilot-key
     logLines: 10
 ```
 
+## 两种安装方式的区别
+
+| 方式 | 依赖怎么来 | 需要额外操作吗 |
+|---|---|---|
+| `npm` / 市场安装（推荐） | DSH 会给**装在 profile 里**的插件解析 `@deepseek-ai/*` 共享包（runtime 的 sharedPackages），peer 依赖由平台提供 | 不需要 |
+| `link:` 本地源码安装 | 插件真实路径在 profile 之外，Node 从那里往上找不到 `@deepseek-ai/*` | 需要把依赖闭包放进插件自己的 `node_modules`（或让它成为 profile 内的一份拷贝） |
+
+`link:` 装法下钩子目录可以用环境变量 `DSH_COPILOT_KEY_DIR` 指过去；也可以在 profile 的
+patch 层里写死：
+
+```yaml
+- id: copilot-key
+  name: dsh-copilot-key
+  config:
+    directory: C:/dsh/copilot-key
+```
+
 ## 兼容性
 
 实测 DSH 内核 **0.1.7-rc.2**；用到 `@deepseek-ai/dsh-tools` 的 `defineTool`、`dsh.bundle.patch` 与 `dsh.profile.bundles`。
