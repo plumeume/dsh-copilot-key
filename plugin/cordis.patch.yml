@@ -1,0 +1,15 @@
+# dsh-copilot-key bundle patch: manage the Copilot-key hook from the app.
+#
+# A single PLAIN insert (no config block), so enabling/disabling this plugin can
+# hot-mount without a harness restart. Defaults live in the plugin's Config schema
+# (lib/index.js); a profile can still override any of them with its own
+# `- id: copilot-key` row under the patch layer.
+#
+# Division of labour (decided 2026-09-26):
+#   * DshCopilotKey.exe + the logon scheduled task keep owning the key itself, so
+#     pressing the key still starts the app when the app is not running;
+#   * this plugin manages that hook (status / start / stop / restart / trigger /
+#     config.ini / logs) and exposes it as agent tools.
+- insert:
+    - id: copilot-key
+      name: 'dsh-copilot-key'

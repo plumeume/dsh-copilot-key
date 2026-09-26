@@ -1,0 +1,22 @@
+name: build hook
+
+on:
+  push:
+    paths: ['hook/**', '.github/workflows/build-hook.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build DshCopilotKey.exe (system csc.exe)
+        shell: pwsh
+        run: ./hook/build.ps1
+      - name: SHA256
+        shell: pwsh
+        run: Get-FileHash ./hook/DshCopilotKey.exe -Algorithm SHA256 | Format-List
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DshCopilotKey-win-x64
+          path: hook/DshCopilotKey.exe

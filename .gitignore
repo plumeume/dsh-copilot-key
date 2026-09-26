@@ -1,0 +1,15 @@
+# runtime artifacts and machine state - never commit these
+node_modules/
+plugin.log
+*.log
+*.bak-*
+config.ini
+*.exe
+capture.log
+probe.log
+
+# editors / os
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
