@@ -21,12 +21,45 @@ F23 down  (vk=0x86, scan=0x6E)
 3. 吞掉随后到达的物理 `LShift↑` `LWin↑`，保证修饰键状态平衡；
 4. 执行启动动作。
 
-## 按键后的行为
+## 安装（两种方式）
 
-- 已装桌面端 → 有窗口就**聚焦**它；没在跑就**启动** `DeepSeek Harness.exe`；
-- 否则退回 Web 流程：`url` 端口已在监听 → 用默认浏览器打开；端口空闲 → 跑 `launcher` 冷启动。
+**A. 直接用 Release 的 exe**（不用装编译环境）
 
-> 冷启动不由启动器再开浏览器：`dsh web` 自己会开（有 `--no-open` 开关）。两条路径都只开一次。
+```powershell
+$dir = "$env:USERPROFILE\copilot-key"
+New-Item -ItemType Directory $dir -Force | Out-Null
+$base = "https://github.com/plumeume/dsh-copilot-key"
+$raw  = "https://raw.githubusercontent.com/plumeume/dsh-copilot-key/master/hook"
+
+Invoke-WebRequest "$base/releases/download/v1.0.0/DshCopilotKey.exe" -OutFile "$dir\DshCopilotKey.exe"
+Invoke-WebRequest "$raw/config.example.ini" -OutFile "$dir\config.ini"
+Invoke-WebRequest "$raw/install.ps1"        -OutFile "$dir\install.ps1"
+Invoke-WebRequest "$raw/uninstall.ps1"      -OutFile "$dir\uninstall.ps1"
+
+Get-FileHash "$dir\DshCopilotKey.exe" -Algorithm SHA256   # 应等于 Release 说明里的 SHA256
+powershell -ExecutionPolicy Bypass -File "$dir\install.ps1"
+```
+
+**B. 克隆后自己编译**：`git clone … && cd hook && powershell -File build.ps1`（见下"常用命令"）。
+
+> `install.ps1` / `uninstall.ps1` 都用 `$PSScriptRoot`，放哪都行；`config.ini` 必须与 exe 同目录。
+
+## 按键后的行为（完整顺序）
+
+每次按键都会把判定结果写进 `watcher.log`。顺序是：
+
+1. **桌面端在运行** → 聚焦它的窗口（`AppActivate`），结束；
+2. 桌面端**已安装未运行** → 启动 `%LOCALAPPDATA%\Programs\DeepSeek Harness\DeepSeek Harness.exe`，结束；
+3. 否则退回 **Web 版**：`config.ini` 的 `port`（默认 3080）已在监听 → 用默认浏览器打开 `url`，结束；
+4. 否则执行 `config.ini` 的 `launcher`（默认 `launch-dsh.cmd` → `launch-dsh.ps1`），按顺序尝试：
+   1. PATH 上的 `dsh` → `dsh web`
+   2. `%LOCALAPPDATA%\npm-cache\_npx` 中**版本最高**的缓存构建 → `node <bin.js> web`
+   3. 都没有 → **`npx -y @deepseek-ai/dsh@alpha web`**：这一步会**联网下载**一个 dsh 到 npx 缓存（首次较慢，之后复用）
+5. `dsh web` 就绪后自己打开浏览器；启动器只在第 3 步（端口已在监听）开浏览器 —— 两条路径都只开一次，不会出现两个标签页。
+
+> **只想用桌面端**：把 `config.ini` 的 `launcher` 指向自己的脚本即可，例如
+> `Start-Process "$env:LOCALAPPDATA\Programs\DeepSeek Harness\DeepSeek Harness.exe"`，
+> 这样第 4 步永远不会去下 Web 版。想只记录不启动：`dryrun = 1`。
 
 ## 文件
 

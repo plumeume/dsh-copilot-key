@@ -1,6 +1,6 @@
 {
   "name": "dsh-copilot-key",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Manage the Windows Copilot-key hook (DshCopilotKey.exe) from inside DeepSeek Harness: status, start/stop/restart, trigger, config.ini editing and logs.",
   "type": "module",
   "main": "lib/index.js",

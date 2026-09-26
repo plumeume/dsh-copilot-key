@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 - 2026-09-26
+
+- 文档补齐：安装章节覆盖全部路径（桌面端 App / 全局 CLI / **npx** / 插件市场），钩子新增 Release 直接下载命令与 SHA256 校验。
+- 新增「按一下 Copilot 键实际会发生什么」完整顺序说明，写明启动器的 npx 回退（`npx -y @deepseek-ai/dsh@alpha web`）会联网下载 dsh，以及如何关掉这一步。
+
 ## 1.0.0 - 2026-09-26
 
 - `hook/`: Copilot 硬件键（LeftWin+LeftShift+F23）低级键盘钩子，吞键 + 补发修饰键以避免开始菜单弹出；

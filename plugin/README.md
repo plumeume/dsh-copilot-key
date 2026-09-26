@@ -7,12 +7,16 @@ DeepSeek Harness 插件：在 App 里管理 [Copilot 键钩子](../hook/)。
 
 ## 安装
 
-```
-dsh plugin --profile <profile> add dsh-copilot-key
-```
+| 你的 DSH 是怎么装的 | 怎么装这个插件 |
+|---|---|
+| **桌面端**（DeepSeek Harness.exe） | **设置 → 插件 → 添加插件**，填 `dsh-copilot-key`（桌面端 profile 由 Electron 独占管理，CLI 会拒绝 `--profile desktop`） |
+| 全局 CLI（`npm i -g @deepseek-ai/dsh`） | `dsh plugin --profile <profile> add dsh-copilot-key` |
+| **没有全局 CLI，用 npx 跑 dsh** | `npx -y @deepseek-ai/dsh@alpha plugin --profile <profile> add dsh-copilot-key` |
+| 插件市场 | 搜 `dsh-copilot-key` 一键安装 |
 
-桌面端（DeepSeek Harness.exe）的 profile 由 Electron 独占管理，CLI 会拒绝 `--profile desktop`：
-请在 **设置 → 插件 → 添加插件** 里填 `dsh-copilot-key`。
+> npx 不会全局安装：它把 dsh 下到 `%LOCALAPPDATA%\npm-cache\_npx` 后复用。
+> 只 `npm i -g dsh-copilot-key` 不会让插件生效 —— 还必须把它加进 profile 的
+> `dsh.profile.bundles`（用上面的命令或 App 界面完成这一步）。
 
 ## 钩子在哪
 

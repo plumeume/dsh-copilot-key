@@ -18,31 +18,75 @@
 
 ## 安装
 
-### 1. 钩子
+### 1. 钩子（按键本身）
+
+**方式 A：直接下载 Release 里的 exe（推荐，不用装编译环境）**
+
+```powershell
+$dir = "$env:USERPROFILE\copilot-key"
+New-Item -ItemType Directory $dir -Force | Out-Null
+$base = "https://github.com/plumeume/dsh-copilot-key"
+$raw  = "https://raw.githubusercontent.com/plumeume/dsh-copilot-key/master/hook"
+
+Invoke-WebRequest "$base/releases/download/v1.0.0/DshCopilotKey.exe" -OutFile "$dir\DshCopilotKey.exe"
+Invoke-WebRequest "$raw/config.example.ini" -OutFile "$dir\config.ini"
+Invoke-WebRequest "$raw/install.ps1"        -OutFile "$dir\install.ps1"
+Invoke-WebRequest "$raw/uninstall.ps1"      -OutFile "$dir\uninstall.ps1"
+
+# 校验：应输出 D4CD3941A5752CFF1C37AC98AAF55D6A24C38CE4F25D42EE4BA5DD6814A06349
+Get-FileHash "$dir\DshCopilotKey.exe" -Algorithm SHA256
+
+# 注册登录自启的计划任务并立即启动
+powershell -ExecutionPolicy Bypass -File "$dir\install.ps1"
+```
+
+> 脚本都用 `$PSScriptRoot`，目录放哪都行；但 `config.ini` 必须和 `DshCopilotKey.exe` 同目录。
+> GitHub 直连不稳时，把上面两个域名换成镜像/代理地址即可。
+
+**方式 B：克隆仓库自己编译**（用系统自带 `csc.exe`，不需要 .NET SDK）
 
 ```powershell
 git clone https://github.com/plumeume/dsh-copilot-key
 cd dsh-copilot-key\hook
-powershell -ExecutionPolicy Bypass -File build.ps1      # 用系统自带 csc.exe 编译
-copy config.example.ini config.ini                     # 按需改 trigger / launcher / dryrun
-powershell -ExecutionPolicy Bypass -File install.ps1    # 注册登录自启计划任务并立即启动
+powershell -ExecutionPolicy Bypass -File build.ps1      # 编译 DshCopilotKey.exe
+copy config.example.ini config.ini                      # 按需改 trigger / launcher / dryrun
+powershell -ExecutionPolicy Bypass -File install.ps1    # 注册登录自启并立即启动
 ```
 
-不想自己编译？从 Releases 下载 `DshCopilotKey.exe`（附 SHA256 校验值）。
+**卸载**：`powershell -ExecutionPolicy Bypass -File uninstall.ps1`（删除计划任务 + 结束进程）
 
-### 2. 插件
+### 2. 插件（在 App 里管理钩子）
 
-npm 安装（推荐，市场也可一键装）：
+| 你的 DSH 是怎么装的 | 怎么装插件 |
+|---|---|
+| **桌面端**（DeepSeek Harness.exe） | **设置 → 插件 → 添加插件**，填 `dsh-copilot-key`（桌面端 profile 由 Electron 独占，CLI 会拒绝 `--profile desktop`） |
+| 全局 CLI（`npm i -g @deepseek-ai/dsh`） | `dsh plugin --profile <profile> add dsh-copilot-key` |
+| **没有全局 CLI、用 npx 跑 dsh** | `npx -y @deepseek-ai/dsh@alpha plugin --profile <profile> add dsh-copilot-key` |
+| 插件市场 | 搜 `dsh-copilot-key` 一键安装 |
 
-```
-dsh plugin --profile <你的 profile> add dsh-copilot-key     # 命令行安装（CLI 能管的 profile）
-```
-
-桌面端（DeepSeek Harness.exe）的 profile 由 Electron 独占、CLI 会拒绝 `--profile desktop`，
-请在 **设置 → 插件 → 添加插件** 里填 `dsh-copilot-key`。
+> npx 方式不会全局安装任何东西：npx 把 dsh 下到 `%LOCALAPPDATA%\npm-cache\_npx` 后复用。
+> 也可以 `npm i -g dsh-copilot-key`，但插件要生效仍需把它加进 profile 的 `dsh.profile.bundles`
+> —— 用上面的命令或 App 界面做这一步即可。
 
 插件默认去 `%USERPROFILE%\copilot-key` 找钩子；钩子装在别处就设环境变量
 `DSH_COPILOT_KEY_DIR`，或在 profile 的 patch 层里覆盖 `directory`。
+
+## 按一下 Copilot 键，实际会发生什么
+
+钩子按这个顺序尝试（每一步都会写进 `watcher.log`）：
+
+1. **桌面端在运行** → 聚焦它的窗口（`AppActivate`，不新建窗口）；
+2. 桌面端**已安装但没运行** → 启动 `%LOCALAPPDATA%\Programs\DeepSeek Harness\DeepSeek Harness.exe`；
+3. 否则退回 **Web 版**：`config.ini` 的 `port` 已在监听 → 用默认浏览器打开 `url`；
+4. 否则执行 `config.ini` 的 `launcher`（默认 `launch-dsh.cmd` → `launch-dsh.ps1`），它依次尝试：
+   - PATH 上的 `dsh` → `dsh web`
+   - `%LOCALAPPDATA%\npm-cache\_npx` 里**版本最高**的缓存构建 → `node <bin.js> web`
+   - 都没有 → **`npx -y @deepseek-ai/dsh@alpha web`**（⚠️ 这一步会**联网下载**一个新的 dsh 到 npx 缓存）
+5. `dsh web` 就绪后由它自己打开浏览器；启动器只在第 3 步（端口已在监听）时开浏览器，避免开出两个标签页。
+
+> 只用桌面端、不希望第 4 步去下 Web 版？把 `config.ini` 的 `launcher` 指向你自己的脚本
+> （例如只做 `Start-Process "$env:LOCALAPPDATA\Programs\DeepSeek Harness\DeepSeek Harness.exe"`）。
+> 想只记录不启动，把 `dryrun` 改成 `1`（下一次按键即生效）。
 
 ## 插件提供的工具
 
