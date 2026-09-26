@@ -21,7 +21,7 @@
 ### 1. 钩子
 
 ```powershell
-git clone https://github.com/<owner>/dsh-copilot-key
+git clone https://github.com/plumeume/dsh-copilot-key
 cd dsh-copilot-key\hook
 powershell -ExecutionPolicy Bypass -File build.ps1      # 用系统自带 csc.exe 编译
 copy config.example.ini config.ini                     # 按需改 trigger / launcher / dryrun

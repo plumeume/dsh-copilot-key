@@ -42,12 +42,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<owner>/dsh-copilot-key.git",
+    "url": "git+https://github.com/plumeume/dsh-copilot-key.git",
     "directory": "plugin"
   },
-  "homepage": "https://github.com/<owner>/dsh-copilot-key",
+  "homepage": "https://github.com/plumeume/dsh-copilot-key",
   "bugs": {
-    "url": "https://github.com/<owner>/dsh-copilot-key/issues"
+    "url": "https://github.com/plumeume/dsh-copilot-key/issues"
   },
   "license": "MIT"
 }
